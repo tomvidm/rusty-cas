@@ -11,7 +11,7 @@ enum Expression {
 
 #[derive(Clone, PartialEq, Debug)]
 enum UnaryFunction {
-    Neg, Sin, Cos, Exp
+    Neg, Sin, Cos, Exp, Sqrt
 }
 
 #[derive(Clone, PartialEq, Debug)]
@@ -115,11 +115,13 @@ impl Expression {
 
 impl UnaryExpression {
     fn calculate(&self, argument_list: &Vec<f64>) -> f64 {
+        let argument_value = self.argument.calculate(argument_list);
         match self.function {
-            UnaryFunction::Neg => return -self.argument.calculate(argument_list),
-            UnaryFunction::Sin => return self.argument.calculate(argument_list).sin(),
-            UnaryFunction::Cos => return self.argument.calculate(argument_list).cos(),
-            UnaryFunction::Exp => return self.argument.calculate(argument_list).exp()
+            UnaryFunction::Neg => return -argument_value,
+            UnaryFunction::Sin => return argument_value.sin(),
+            UnaryFunction::Cos => return argument_value.cos(),
+            UnaryFunction::Exp => return argument_value.exp(),
+            UnaryFunction::Sqrt => return argument_value.sqrt()
         }
     }
 
@@ -128,7 +130,6 @@ impl UnaryExpression {
     }
 
     fn get_derivative(&self, variable: usize) -> Expression {
-        println!("LOL");
         match self.function {
             UnaryFunction::Neg => {
                 return Expression::new_unary_expr(
@@ -164,6 +165,17 @@ impl UnaryExpression {
                     self.argument.get_derivative(variable),
                     Expression::UnaryExpr(self.clone()),
                     BinaryFunction::Mul
+                )
+            }
+            UnaryFunction::Sqrt => {
+                return Expression::new_binary_expr(
+                    self.argument.get_derivative(variable),
+                    Expression::new_binary_expr(
+                        Expression::from_float(2.),
+                        Expression::UnaryExpr(self.clone()),
+                        BinaryFunction::Mul
+                    ),
+                    BinaryFunction::Div
                 )
             }
         }
@@ -289,6 +301,10 @@ impl Expression {
     fn exp(&self) -> Expression {
         return Expression::new_unary_expr(self.clone(), UnaryFunction::Exp)
     }
+
+    fn sqrt(&self) -> Expression {
+        return Expression::new_unary_expr(self.clone(), UnaryFunction::Sqrt)
+    }
 }
 
 #[cfg(test)]
@@ -316,13 +332,15 @@ fn test_derivative() {
     let exparg = a.add(&x);
     let powexpr = exparg.exp();
 
-    println!("{:?}", powexpr);
-    println!("==========================");
-    println!("{:?}", powexpr.get_derivative(0));
-
     assert_eq!(exparg.get_derivative(0).calculate(&arglist), 1.);
     assert_eq!(powexpr.calculate(&arglist), 1096.6331584284585);
     assert_eq!(powexpr.get_derivative(0).calculate(&arglist), 1096.6331584284585);
+
+    let arglist2 = vec![0.25];
+    let sqrt_expr = Expression::Variable(0).sqrt();
+    println!("{:?}", sqrt_expr);
+    println!("{:?}", sqrt_expr.get_derivative(0));
+    assert_eq!(sqrt_expr.get_derivative(0).calculate(&arglist2), 1.);
 
 
 }
