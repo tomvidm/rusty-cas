@@ -1,13 +1,11 @@
-use std::ops::{Add, Sub, Mul, Div};
-
 #[derive(Clone, PartialEq, Debug)]
-enum Expression {
+pub enum Expression {
     Constant(f64),
     IntegerConstant(i64),
     Variable(usize),
     UnaryExpr(UnaryExpression),
     BinaryExpr(BinaryExpression),
-    Error
+    Error(String)
 }
 
 #[derive(Clone, PartialEq, Debug)]
@@ -41,7 +39,7 @@ impl Expression {
             Expression::Variable(arg_index) => return argument_list[*arg_index],
             Expression::UnaryExpr(unary_expression) => return unary_expression.calculate(argument_list),
             Expression::BinaryExpr(binary_expression) => return binary_expression.calculate(argument_list),
-            Expression::Error => 0. //Maybe some NaN value
+            Expression::Error(error_string) => 0. //Maybe some NaN value
         }
     }
 
@@ -52,8 +50,43 @@ impl Expression {
             Expression::Variable(arg_index) => *arg_index == variable,
             Expression::UnaryExpr(unary_expression) => unary_expression.depends_on_variable(variable),
             Expression::BinaryExpr(binary_expression) => binary_expression.depends_on_variable(variable),
-            Expression::Error => false
+            Expression::Error(error_string) => false
         }
+    }
+
+    fn depends_on_any_variable(&self) -> bool {
+        match self {
+            Expression::Constant(val) => return true,
+            Expression::IntegerConstant(intval) => return true,
+            Expression::Variable(var) => return false,
+            Expression::UnaryExpr(unary_expr) => unary_expr.depends_on_any_variable(),
+            Expression::BinaryExpr(binary_expr) => binary_expr.depends_on_any_variable(),
+            Expression::Error(error_string) => return false
+        }
+    }
+
+    fn is_unity(&self) -> bool {
+        match self {
+            Expression::Constant(val) => return *val == 1.,
+            Expression::IntegerConstant(intval) => return *intval == 1,
+            _ => return false
+        }
+    }
+
+    fn is_zero(&self) -> bool {
+        match self {
+            Expression::Constant(val) => return *val == 0.,
+            Expression::IntegerConstant(intval) => return *intval == 0,
+            _ => return false
+        }
+    }
+
+    fn one() -> Expression {
+        return Expression::IntegerConstant(1)
+    }
+
+    fn zero() -> Expression {
+        return Expression::IntegerConstant(0)
     }
 
     fn from_float(val: f64) -> Expression {
@@ -74,7 +107,7 @@ impl Expression {
                 function: function,
                 argument: Box::new(arg)
             }
-        )
+        ).get_simplified()
     }
 
     fn new_binary_expr(lhs: Expression, rhs: Expression, function: BinaryFunction) -> Expression {
@@ -84,7 +117,11 @@ impl Expression {
                 lhs: Box::new(lhs),
                 rhs: Box::new(rhs)
             }
-        )
+        ).get_simplified()
+    }
+
+    fn new_error(error_string: String) -> Expression {
+        return Expression::Error(error_string)
     }
 
     fn get_derivative(&self, variable: usize) -> Expression {
@@ -112,7 +149,18 @@ impl Expression {
                     return Expression::Constant(0.)
                 }
             },
-            Expression::Error => Expression::Error
+            Expression::Error(error_string) => return self.clone()
+        }
+    }
+
+    fn get_simplified(&self) -> Expression {
+        match self {
+            Expression::Constant(a) => self.clone(),
+            Expression::IntegerConstant(a) => self.clone(),
+            Expression::Variable(a) => self.clone(),
+            Expression::UnaryExpr(unary_expr) => unary_expr.get_simplified(),
+            Expression::BinaryExpr(binary_expr) => binary_expr.get_simplified(),
+            Expression::Error(error_string) => return self.clone()
         }
     }
 
@@ -123,7 +171,7 @@ impl Expression {
             Expression::Variable(arg_index) => return format!("[{}]", arg_index.to_string()),
             Expression::UnaryExpr(unary_expression) => return unary_expression.to_string(),
             Expression::BinaryExpr(binary_expression) => return binary_expression.to_string(),
-            Expression::Error => return String::from("ERROR")
+            Expression::Error(error_string) => return error_string.clone()
         }
     }
 }
@@ -142,6 +190,10 @@ impl UnaryExpression {
 
     fn depends_on_variable(&self, variable: usize) -> bool {
         self.argument.depends_on_variable(variable)
+    }
+
+    fn depends_on_any_variable(&self) -> bool {
+        return self.argument.depends_on_any_variable();
     }
 
     fn get_derivative(&self, variable: usize) -> Expression {
@@ -196,6 +248,10 @@ impl UnaryExpression {
         }
     }
 
+    fn get_simplified(&self) -> Expression {
+        Expression::UnaryExpr(self.clone())
+    }
+
     fn to_string(&self) -> String {
         let arg_string = self.argument.to_string();
         match self.function {
@@ -225,9 +281,14 @@ impl BinaryExpression {
         return self.lhs.depends_on_variable(variable) || self.rhs.depends_on_variable(variable)
     }
 
+    fn depends_on_any_variable(&self) -> bool {
+        return self.lhs.depends_on_any_variable() ||
+               self.rhs.depends_on_any_variable()
+    }
+
     fn get_derivative(&self, variable: usize) -> Expression {
         match self.function {
-            // Simple linera addition
+            // Simple linear addition
             BinaryFunction::Add => {
                 return Expression::new_binary_expr(
                     self.lhs.get_derivative(variable),
@@ -261,7 +322,7 @@ impl BinaryExpression {
                     ),
                     BinaryFunction::Add
                 )
-            }
+            },
             // Quotient rule
             BinaryFunction::Div => {
                 // [g'(x)h(x) - g(x)h'(x)] / h(x)^2
@@ -309,6 +370,54 @@ impl BinaryExpression {
         }
     }
 
+    // This method returns simplified expression, based on simple rules.
+    // More sophisticated methods should be handled by a solver. This is just
+    // to clean up expressions on the go.
+    //   0 + a = a
+    //   0 * a = 0
+    //   1 * a = a
+    //   a / a = 1
+    fn get_simplified(&self) -> Expression {
+        match self.function {
+            BinaryFunction::Add => {
+                if self.lhs.is_zero() {
+                    return *self.rhs.clone()
+                }
+
+                if self.rhs.is_zero() {
+                    return *self.lhs.clone()
+                }
+
+                return Expression::BinaryExpr(self.clone())
+            },
+
+            BinaryFunction::Mul => {
+                if self.lhs.is_zero() || self.rhs.is_zero() {
+                    return Expression::from_integer(0)
+                }
+
+                if self.lhs.is_unity() {
+                    return *self.rhs.clone()
+                }
+
+                if self.rhs.is_unity() {
+                    return *self.lhs.clone()
+                }
+
+                return Expression::BinaryExpr(self.clone())
+            },
+
+            BinaryFunction::Div => {
+                if self.lhs == self.rhs {
+                    return Expression::from_integer(1)
+                }
+
+                return Expression::BinaryExpr(self.clone())
+            }
+            _ => return Expression::BinaryExpr(self.clone())
+        }
+    }
+
     fn to_string(&self) -> String {
         let lhs_string = self.lhs.to_string();
         let rhs_string = self.rhs.to_string();
@@ -347,6 +456,14 @@ impl Expression {
         return Expression::new_binary_expr(self.clone(), other.clone(), BinaryFunction::Pow)
     }
 
+    fn sin(&self, other: &Expression) -> Expression {
+        return Expression::new_unary_expr(self.clone(), UnaryFunction::Sin)   
+    }
+
+    fn cos(&self, other: &Expression) -> Expression {
+        return Expression::new_unary_expr(self.clone(), UnaryFunction::Cos)   
+    }
+
     fn exp(&self) -> Expression {
         return Expression::new_unary_expr(self.clone(), UnaryFunction::Exp)
     }
@@ -363,8 +480,10 @@ fn test_symexpr() {
     let b = Expression::new_variable(0);
     let c = Expression::new_variable(1);
     let arglist = vec![3., 4.];
+    let d = Expression::from_float(2.);
 
     assert_eq!(a.mul(&b.add(&c)).calculate(&arglist), 14.);
+    assert_eq!(a, d);
 }
 
 #[test]
@@ -378,9 +497,6 @@ fn test_derivative() {
     assert_eq!(expr.calculate(&arglist), 51.);
     assert_eq!(expr.get_derivative(0).calculate(&arglist), 19.8);
 
-    println!("{}", expr.to_string());
-    println!("{}", expr.get_derivative(0).to_string());
-
     let exparg = a.add(&x);
     let powexpr = exparg.exp();
 
@@ -391,9 +507,21 @@ fn test_derivative() {
     let arglist2 = vec![0.25];
     let sqrt_expr = Expression::Variable(0).sqrt();
     assert_eq!(sqrt_expr.get_derivative(0).calculate(&arglist2), 1.);
+}
 
-    println!("{}", sqrt_expr.to_string());
-    println!("{}", sqrt_expr.get_derivative(0).to_string());
+#[test]
+fn test_simplification() {
+    let zero = Expression::zero();
+    let one = Expression::one();
+    let x = Expression::Variable(0);
 
-    assert!(false);
+    let expr = zero.add(&one.sin(&x));
+
+    println!("{:?}", expr);
+
+    assert_eq!(expr, Expression::UnaryExpr(
+                    UnaryExpression { 
+                        function: UnaryFunction::Sin, 
+                        argument: Box::new(Expression::one())
+                    }));
 }
