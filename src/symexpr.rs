@@ -456,11 +456,11 @@ impl Expression {
         return Expression::new_binary_expr(self.clone(), other.clone(), BinaryFunction::Pow)
     }
 
-    fn sin(&self, other: &Expression) -> Expression {
+    fn sin(&self) -> Expression {
         return Expression::new_unary_expr(self.clone(), UnaryFunction::Sin)   
     }
 
-    fn cos(&self, other: &Expression) -> Expression {
+    fn cos(&self) -> Expression {
         return Expression::new_unary_expr(self.clone(), UnaryFunction::Cos)   
     }
 
@@ -515,13 +515,15 @@ fn test_simplification() {
     let one = Expression::one();
     let x = Expression::Variable(0);
 
-    let expr = zero.add(&one.sin(&x));
+    let expr = zero.add(&one.mul(&x.sin()));
 
     println!("{:?}", expr);
+    println!("{}", expr.to_string());
 
     assert_eq!(expr, Expression::UnaryExpr(
                     UnaryExpression { 
                         function: UnaryFunction::Sin, 
-                        argument: Box::new(Expression::one())
+                        argument: Box::new(Expression::Variable(0))
                     }));
+    assert!(false);
 }
