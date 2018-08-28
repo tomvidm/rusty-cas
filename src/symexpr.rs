@@ -6,7 +6,8 @@ enum Expression {
     IntegerConstant(i64),
     Variable(usize),
     UnaryExpr(UnaryExpression),
-    BinaryExpr(BinaryExpression)
+    BinaryExpr(BinaryExpression),
+    Error
 }
 
 #[derive(Clone, PartialEq, Debug)]
@@ -39,7 +40,8 @@ impl Expression {
             Expression::IntegerConstant(intval) => return *intval as f64,
             Expression::Variable(arg_index) => return argument_list[*arg_index],
             Expression::UnaryExpr(unary_expression) => return unary_expression.calculate(argument_list),
-            Expression::BinaryExpr(binary_expression) => return binary_expression.calculate(argument_list)
+            Expression::BinaryExpr(binary_expression) => return binary_expression.calculate(argument_list),
+            Expression::Error => 0. //Maybe some NaN value
         }
     }
 
@@ -49,7 +51,8 @@ impl Expression {
             Expression::IntegerConstant(intval) => return false,
             Expression::Variable(arg_index) => *arg_index == variable,
             Expression::UnaryExpr(unary_expression) => unary_expression.depends_on_variable(variable),
-            Expression::BinaryExpr(binary_expression) => binary_expression.depends_on_variable(variable)
+            Expression::BinaryExpr(binary_expression) => binary_expression.depends_on_variable(variable),
+            Expression::Error => false
         }
     }
 
@@ -108,7 +111,8 @@ impl Expression {
                 } else {
                     return Expression::Constant(0.)
                 }
-            }
+            },
+            Expression::Error => Expression::Error
         }
     }
 
@@ -118,7 +122,8 @@ impl Expression {
             Expression::IntegerConstant(intval) => return intval.to_string(),
             Expression::Variable(arg_index) => return format!("[{}]", arg_index.to_string()),
             Expression::UnaryExpr(unary_expression) => return unary_expression.to_string(),
-            Expression::BinaryExpr(binary_expression) => return binary_expression.to_string()
+            Expression::BinaryExpr(binary_expression) => return binary_expression.to_string(),
+            Expression::Error => return String::from("ERROR")
         }
     }
 }
