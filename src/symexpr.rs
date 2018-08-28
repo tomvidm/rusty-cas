@@ -1,3 +1,19 @@
+/*
+    The Expression enum represents mathematical expressions as 
+    a variant type. Each of the variants serves a function, and
+    can be freely combined.
+
+    * Constant: A constant float value
+    * IntegerConstant: An constant integer value
+    * Variable: This represents a variable, and the value is an
+    *   index of a float value in an argument list, which has to 
+    *   be supplied whenever the calculate(variable: usize) method 
+    *   is called.
+    * UnaryExpr: An elementary function with one argument
+    * BinaryExpr: An elementary function with two arguments
+    * Sum: A sum of an arbitrary number of terms. 
+    * Error: A support variant for when I feel like caring about errors.
+*/
 #[derive(Clone, PartialEq, Debug)]
 pub enum Expression {
     Constant(f64),
@@ -5,6 +21,7 @@ pub enum Expression {
     Variable(usize),
     UnaryExpr(UnaryExpression),
     BinaryExpr(BinaryExpression),
+    Sum(SumExpression),
     Error(String)
 }
 
@@ -31,6 +48,11 @@ pub struct BinaryExpression {
     rhs: Box<Expression>
 }
 
+#[derive(Clone, PartialEq, Debug)]
+pub struct SumExpression {
+    terms: Vec<Box<Expression>>
+}
+
 impl Expression {
     fn calculate(&self, argument_list: &Vec<f64>) -> f64 {
         match self {
@@ -39,6 +61,7 @@ impl Expression {
             Expression::Variable(arg_index) => return argument_list[*arg_index],
             Expression::UnaryExpr(unary_expression) => return unary_expression.calculate(argument_list),
             Expression::BinaryExpr(binary_expression) => return binary_expression.calculate(argument_list),
+            Expression::Sum(sum_expr) => return sum_expr.calculate(argument_list),
             Expression::Error(error_string) => 0. //Maybe some NaN value
         }
     }
@@ -50,6 +73,7 @@ impl Expression {
             Expression::Variable(arg_index) => *arg_index == variable,
             Expression::UnaryExpr(unary_expression) => unary_expression.depends_on_variable(variable),
             Expression::BinaryExpr(binary_expression) => binary_expression.depends_on_variable(variable),
+            Expression::Sum(sum_expr) => sum_expr.depends_on_variable(variable),
             Expression::Error(error_string) => false
         }
     }
@@ -61,6 +85,7 @@ impl Expression {
             Expression::Variable(var) => return false,
             Expression::UnaryExpr(unary_expr) => unary_expr.depends_on_any_variable(),
             Expression::BinaryExpr(binary_expr) => binary_expr.depends_on_any_variable(),
+            Expression::Sum(sum_expr) => sum_expr.depends_on_any_variable(),
             Expression::Error(error_string) => return false
         }
     }
@@ -120,6 +145,14 @@ impl Expression {
         ).get_simplified()
     }
 
+    fn new_sum_expr(term_list: Vec<Box<Expression>>) -> Expression {
+        return Expression::Sum(
+            SumExpression{
+                terms: term_list
+            }
+        )
+    }
+
     fn new_error(error_string: String) -> Expression {
         return Expression::Error(error_string)
     }
@@ -130,25 +163,32 @@ impl Expression {
             Expression::IntegerConstant(intval) => return Expression::IntegerConstant(0),
             Expression::Variable(arg_index) => {
                 if *arg_index == variable {
-                    return Expression::Constant(1.)
+                    return Expression::one()
                 } else {
-                    return Expression::Constant(0.)
+                    return Expression::zero()
                 }
             },
             Expression::UnaryExpr(unary_expression) => {
                 if unary_expression.depends_on_variable(variable) {
                     return unary_expression.get_derivative(variable)
                 } else {
-                    return Expression::Constant(0.)
+                    return Expression::zero()
                 }
             },
             Expression::BinaryExpr(binary_expression) => {
                 if binary_expression.depends_on_variable(variable) {
                     return binary_expression.get_derivative(variable)
                 } else {
-                    return Expression::Constant(0.)
+                    return Expression::zero()
                 }
             },
+            Expression::Sum(sum_expr) => {
+                if sum_expr.depends_on_variable(variable) {
+                    return sum_expr.get_derivative(variable)
+                } else {
+                    return Expression::zero()
+                }
+            }
             Expression::Error(error_string) => return self.clone()
         }
     }
@@ -160,6 +200,7 @@ impl Expression {
             Expression::Variable(a) => self.clone(),
             Expression::UnaryExpr(unary_expr) => unary_expr.get_simplified(),
             Expression::BinaryExpr(binary_expr) => binary_expr.get_simplified(),
+            Expression::Sum(sum_expr) => sum_expr.get_simplified(),
             Expression::Error(error_string) => return self.clone()
         }
     }
@@ -171,6 +212,7 @@ impl Expression {
             Expression::Variable(arg_index) => return format!("[{}]", arg_index.to_string()),
             Expression::UnaryExpr(unary_expression) => return unary_expression.to_string(),
             Expression::BinaryExpr(binary_expression) => return binary_expression.to_string(),
+            Expression::Sum(sum_expr) => return sum_expr.to_string(),
             Expression::Error(error_string) => return error_string.clone()
         }
     }
@@ -431,9 +473,66 @@ impl BinaryExpression {
     }
 }
 
-// ==================
-// Operator overloads
-// ==================
+impl SumExpression {
+    fn push_expression(&mut self, expr: &Expression) {
+        match expr {
+            Expression::Sum(sum_expr) => {
+                for term in sum_expr.terms.iter() {
+                    self.push_expression(term);
+                }
+            },
+            _ => self.terms.push(Box::new(expr.clone()))
+        }
+    }
+
+    fn calculate(&self, argument_list: &Vec<f64>) -> f64 {
+        let mut result: f64 = 0.;
+        for term in self.terms.iter() {
+            result += term.calculate(&argument_list);
+        }
+        return result;
+    }
+
+    fn depends_on_variable(&self, variable: usize) -> bool {
+        for term in self.terms.iter() {
+            if term.depends_on_variable(variable) {
+                return true
+            }
+        }
+
+        return false
+    }
+
+    fn depends_on_any_variable(&self) -> bool {
+        for term in self.terms.iter() {
+            if term.depends_on_any_variable() {
+                return true
+            }
+        }
+
+        return false
+    }
+
+    fn get_derivative(&self, variable: usize) -> Expression {
+        let mut derived_terms: Vec<Box<Expression>> = Vec::new();
+        for term in self.terms.iter() {
+            derived_terms.push(Box::new(term.get_derivative(variable)));
+        }
+        return Expression::new_sum_expr(derived_terms)
+    }
+
+    fn get_simplified(&self) -> Expression {
+        return Expression::Sum(self.clone())
+    }
+
+    fn to_string(&self) -> String {
+        let mut result = String::from("(");
+        for term in self.terms.iter() {
+            result = format!("{} + {}", result, term.to_string());
+        }
+        return result
+    }
+}
 
 impl Expression {
     fn add(&self, other: &Expression) -> Expression {

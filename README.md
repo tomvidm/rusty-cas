@@ -16,8 +16,6 @@ During construction of expressions, the module uses simple rules to clean up any
 1 * a = a
 0 + a = a
 a / a = 1
-a * b = c       # where a and b are constants
-a + b = c       # where a and b are constants
 ```
 
 ## Planned features
