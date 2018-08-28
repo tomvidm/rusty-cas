@@ -1,0 +1,6 @@
+[package]
+name = "sym"
+version = "0.1.0"
+authors = ["Tom Michalsen <tomvidm@gmail.com>"]
+
+[dependencies]
