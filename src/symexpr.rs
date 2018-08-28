@@ -1,6 +1,6 @@
 use std::ops::{Add, Sub, Mul, Div};
 
-#[derive(Clone, PartialEq)]
+#[derive(Clone, PartialEq, Debug)]
 enum Expression {
     Constant(f64),
     IntegerConstant(i64),
@@ -9,23 +9,23 @@ enum Expression {
     BinaryExpr(BinaryExpression)
 }
 
-#[derive(Clone, PartialEq)]
+#[derive(Clone, PartialEq, Debug)]
 enum UnaryFunction {
-    Neg, Sin, Cos
+    Neg, Sin, Cos, Exp
 }
 
-#[derive(Clone, PartialEq)]
+#[derive(Clone, PartialEq, Debug)]
 enum BinaryFunction {
     Add, Sub, Mul, Div, Pow
 }
 
-#[derive(Clone, PartialEq)]
+#[derive(Clone, PartialEq, Debug)]
 pub struct UnaryExpression {
     function: UnaryFunction,
     argument: Box<Expression>
 }
 
-#[derive(Clone, PartialEq)]
+#[derive(Clone, PartialEq, Debug)]
 pub struct BinaryExpression {
     function: BinaryFunction,
     lhs: Box<Expression>,
@@ -97,7 +97,7 @@ impl Expression {
             },
             Expression::UnaryExpr(unary_expression) => {
                 if unary_expression.depends_on_variable(variable) {
-                    return unary_expression.argument.get_derivative(variable)
+                    return unary_expression.get_derivative(variable)
                 } else {
                     return Expression::Constant(0.)
                 }
@@ -118,7 +118,8 @@ impl UnaryExpression {
         match self.function {
             UnaryFunction::Neg => return -self.argument.calculate(argument_list),
             UnaryFunction::Sin => return self.argument.calculate(argument_list).sin(),
-            UnaryFunction::Cos => return self.argument.calculate(argument_list).cos()
+            UnaryFunction::Cos => return self.argument.calculate(argument_list).cos(),
+            UnaryFunction::Exp => return self.argument.calculate(argument_list).exp()
         }
     }
 
@@ -127,6 +128,7 @@ impl UnaryExpression {
     }
 
     fn get_derivative(&self, variable: usize) -> Expression {
+        println!("LOL");
         match self.function {
             UnaryFunction::Neg => {
                 return Expression::new_unary_expr(
@@ -154,6 +156,13 @@ impl UnaryExpression {
                         *self.argument.clone(),
                         UnaryFunction::Sin
                     ),
+                    BinaryFunction::Mul
+                )
+            },
+            UnaryFunction::Exp => {
+                return Expression::new_binary_expr(
+                    self.argument.get_derivative(variable),
+                    Expression::UnaryExpr(self.clone()),
                     BinaryFunction::Mul
                 )
             }
@@ -238,8 +247,8 @@ impl BinaryExpression {
                     // h(x)^2
                     Expression::new_binary_expr(
                         *self.rhs.clone(),
-                        *self.rhs.clone(),
-                        BinaryFunction::Mul
+                        Expression::from_integer(2),
+                        BinaryFunction::Pow
                     ),
                     BinaryFunction::Div
                 )
@@ -272,6 +281,14 @@ impl Expression {
     fn div(&self, other: &Expression) -> Expression {
         return Expression::new_binary_expr(self.clone(), other.clone(), BinaryFunction::Div)
     }
+
+    fn pow(&self, other: &Expression) -> Expression {
+        return Expression::new_binary_expr(self.clone(), other.clone(), BinaryFunction::Pow)
+    }
+
+    fn exp(&self) -> Expression {
+        return Expression::new_unary_expr(self.clone(), UnaryFunction::Exp)
+    }
 }
 
 #[cfg(test)]
@@ -292,6 +309,20 @@ fn test_derivative() {
     let x = Expression::Variable(0);
     let c = Expression::Constant(5.);
     let expr = a.mul(&x.mul(&x)).add(&c.div(&x));
+    
     assert_eq!(expr.calculate(&arglist), 51.);
     assert_eq!(expr.get_derivative(0).calculate(&arglist), 19.8);
+
+    let exparg = a.add(&x);
+    let powexpr = exparg.exp();
+
+    println!("{:?}", powexpr);
+    println!("==========================");
+    println!("{:?}", powexpr.get_derivative(0));
+
+    assert_eq!(exparg.get_derivative(0).calculate(&arglist), 1.);
+    assert_eq!(powexpr.calculate(&arglist), 1096.6331584284585);
+    assert_eq!(powexpr.get_derivative(0).calculate(&arglist), 1096.6331584284585);
+
+
 }
