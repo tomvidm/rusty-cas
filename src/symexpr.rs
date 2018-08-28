@@ -87,7 +87,7 @@ impl Expression {
     fn get_derivative(&self, variable: usize) -> Expression {
         match self {
             Expression::Constant(val) => return Expression::Constant(0.),
-            Expression::IntegerConstant(val) => return Expression::IntegerConstant(0),
+            Expression::IntegerConstant(intval) => return Expression::IntegerConstant(0),
             Expression::Variable(arg_index) => {
                 if *arg_index == variable {
                     return Expression::Constant(1.)
@@ -109,6 +109,16 @@ impl Expression {
                     return Expression::Constant(0.)
                 }
             }
+        }
+    }
+
+    fn to_string(&self) -> String {
+        match self {
+            Expression::Constant(val) => return val.to_string(),
+            Expression::IntegerConstant(intval) => return intval.to_string(),
+            Expression::Variable(arg_index) => return format!("[{}]", arg_index.to_string()),
+            Expression::UnaryExpr(unary_expression) => return unary_expression.to_string(),
+            Expression::BinaryExpr(binary_expression) => return binary_expression.to_string()
         }
     }
 }
@@ -178,6 +188,17 @@ impl UnaryExpression {
                     BinaryFunction::Div
                 )
             }
+        }
+    }
+
+    fn to_string(&self) -> String {
+        let arg_string = self.argument.to_string();
+        match self.function {
+            UnaryFunction::Neg => format!("(-{})", arg_string),
+            UnaryFunction::Sin => format!("sin({})", arg_string),
+            UnaryFunction::Cos => format!("cos({})", arg_string),
+            UnaryFunction::Exp => format!("exp({})", arg_string),
+            UnaryFunction::Sqrt => format!("sqrt({})", arg_string)
         }
     }
 }
@@ -265,10 +286,33 @@ impl BinaryExpression {
                     BinaryFunction::Div
                 )
             },
+            // This one only accounts for pow(x,y) where y >= 0
             BinaryFunction::Pow => {
-                println!("Pow function for expressions is not yet implemented...");
-                return Expression::Constant(0.)
+                // g'(x) * f'(X)^(g(x))
+                return Expression::new_binary_expr(
+                    // g'(x)
+                    self.rhs.get_derivative(variable),
+                    // f'(x) ^ g(x)
+                    Expression::new_binary_expr(
+                        self.lhs.get_derivative(variable),
+                        self.rhs.clone().sub(&Expression::from_integer(1)),
+                        BinaryFunction::Pow
+                    ),
+                    BinaryFunction::Mul
+                )
             }
+        }
+    }
+
+    fn to_string(&self) -> String {
+        let lhs_string = self.lhs.to_string();
+        let rhs_string = self.rhs.to_string();
+        match self.function {
+            BinaryFunction::Add => return format!("({} + {})", lhs_string, rhs_string),
+            BinaryFunction::Sub => return format!("({} - {})", lhs_string, rhs_string),
+            BinaryFunction::Mul => return format!("({} * {})", lhs_string, rhs_string),
+            BinaryFunction::Div => return format!("({} / {})", lhs_string, rhs_string),
+            BinaryFunction::Pow => return format!("({} ^ {})", lhs_string, rhs_string)
         }
     }
 }
@@ -329,6 +373,9 @@ fn test_derivative() {
     assert_eq!(expr.calculate(&arglist), 51.);
     assert_eq!(expr.get_derivative(0).calculate(&arglist), 19.8);
 
+    println!("{}", expr.to_string());
+    println!("{}", expr.get_derivative(0).to_string());
+
     let exparg = a.add(&x);
     let powexpr = exparg.exp();
 
@@ -338,9 +385,10 @@ fn test_derivative() {
 
     let arglist2 = vec![0.25];
     let sqrt_expr = Expression::Variable(0).sqrt();
-    println!("{:?}", sqrt_expr);
-    println!("{:?}", sqrt_expr.get_derivative(0));
     assert_eq!(sqrt_expr.get_derivative(0).calculate(&arglist2), 1.);
 
+    println!("{}", sqrt_expr.to_string());
+    println!("{}", sqrt_expr.get_derivative(0).to_string());
 
+    assert!(false);
 }
