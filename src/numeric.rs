@@ -50,6 +50,14 @@ impl Numeric {
             Numeric::Integer(integer) => return *integer == 0
         }
     }
+
+    pub fn is_unity(&self) -> bool {
+        match self {
+            Numeric::Real(real) => return *real == 1.,
+            Numeric::Complex(complex) => return *complex == 1.,
+            Numeric::Integer(integer) => return *integer == 1
+        }
+    }
 }
 
 impl Neg for Numeric {

@@ -57,6 +57,20 @@ impl Expr {
         Expr::Variable(key.clone())
     }
 
+    fn is_unity(&self) -> bool {
+        match self {
+            Expr::Numeric(numeric) => return numeric.is_unity(),
+            _ => return false
+        }
+    }
+
+    fn is_zero(&self) -> bool {
+        match self {
+            Expr::Numeric(numeric) => return numeric.is_zero(),
+            _ => return false
+        }
+    }
+
     fn unary_from(argument: &Expr, function: UnaryFunction) -> Expr {
         Expr::Unary(
             Unary{
@@ -115,6 +129,15 @@ impl Expr {
         }
     }
 
+    fn get_cleaned(&self) -> Expr {
+        match self {
+            Expr::Binary(binary) => {
+                return binary.clone().get_cleaned()
+            },
+            _ => return self.clone()
+        }
+    }
+
     fn neg(&self) -> Expr {
         return Expr::unary_from(self, UnaryFunction::Neg)
     }
@@ -153,6 +176,45 @@ impl Binary {
             BinaryFunction::Div => return self.lhs.eval(expr_map) / self.rhs.eval(expr_map)
         }
     }
+
+    fn get_cleaned(self) -> Expr {
+        match self.function {
+            BinaryFunction::Add => {
+                if self.lhs.is_zero() {
+                    return *self.rhs.clone()
+                }
+
+                if self.rhs.is_zero() {
+                    return *self.lhs.clone()
+                }
+
+                return Expr::Binary(self)
+            },
+            BinaryFunction::Mul => {
+                if self.lhs.is_zero() || self.rhs.is_zero() {
+                    return Expr::from_integer(0)
+                }
+
+                if self.lhs.is_unity() {
+                    return *self.rhs.clone()
+                }
+
+                if self.rhs.is_unity() {
+                    return *self.lhs.clone()
+                }
+
+                return Expr::Binary(self)
+            },
+            BinaryFunction::Div => {
+                if self.lhs == self.rhs {
+                    return Expr::from_integer(1)
+                }
+
+                return Expr::Binary(self)
+            }
+            _ => return Expr::Binary(self)
+        }
+    }
 }
 
 #[cfg(test)]
@@ -178,4 +240,28 @@ fn test_basic_variable_mapping() {
     // 1 + x where x = 5 gives 6
     assert_eq!(one_plus_x.eval(&expr_map), Numeric::from_integer(6));
     assert_eq!(one_minus_x.eval(&expr_map), Numeric::from_integer(-4));
+}
+
+#[test]
+fn test_basic_cleanup() {
+    let mut expr_map: HashMap<String, Box<Expr>> = HashMap::new();
+    let x_key = String::from("x");
+    let x_val = Expr::from_real(5.);
+    let x = Expr::from_key(&x_key);
+    let one = Expr::from_integer(1);
+    let zero = Expr::from_integer(0);
+
+    expr_map.insert(x_key, Box::new(x_val));
+
+    let one_plus_x = one.add(&x);
+    let messy_expr_1 = one.mul(&one_plus_x);
+    let messy_expr_2 = zero.mul(&one_plus_x);
+    let messy_expr_3 = zero.add(&one_plus_x);
+    let messy_expr_4 = one_plus_x.div(&one_plus_x);
+
+    assert_eq!(one_plus_x.get_cleaned(), one_plus_x);
+    assert_eq!(messy_expr_1.get_cleaned(), one_plus_x);
+    assert_eq!(messy_expr_2.get_cleaned(), zero);
+    assert_eq!(messy_expr_3.get_cleaned(), one_plus_x);
+    assert_eq!(messy_expr_4.get_cleaned(), one);
 }
