@@ -66,6 +66,14 @@ impl Numeric {
             Numeric::Integer(integer) => return Numeric::from_integer(integer.pow(pow as u32))
         }
     }
+
+    pub fn exp(&self) -> Numeric {
+        match self {
+            Numeric::Real(real) => return Numeric::from_real(real.exp()),
+            Numeric::Complex(complex) => return Numeric::from_complex(complex.exp()),
+            Numeric::Integer(integer) => return Numeric::from_real((*integer as RealType).exp())
+        }
+    }
 }
 
 impl Neg for Numeric {

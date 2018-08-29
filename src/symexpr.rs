@@ -23,7 +23,8 @@ struct Power {
 
 #[derive(Clone, PartialEq, Debug)]
 enum UnaryFunction {
-    Neg
+    Neg,
+    Exp
 }
 
 #[derive(Clone, PartialEq, Debug)]
@@ -190,6 +191,10 @@ impl Expr {
         return Expr::unary_from(self, UnaryFunction::Neg)
     }
 
+    fn exp(&self) -> Expr {
+        return Expr::unary_from(self, UnaryFunction::Exp)
+    }
+
     fn add(&self, other: &Expr) -> Expr {
         return Expr::binary_from(self, other, BinaryFunction::Add)
     }
@@ -239,7 +244,8 @@ impl Power {
 impl Unary {
     fn eval(&self, expr_map: &HashMap<String, Box<Expr>>) -> Numeric {
         match self.function {
-            UnaryFunction::Neg => return -self.argument.eval(expr_map)
+            UnaryFunction::Neg => return -self.argument.eval(expr_map),
+            UnaryFunction::Exp => return self.argument.eval(expr_map).exp()
         }
     }
 
@@ -253,6 +259,9 @@ impl Unary {
         match self.function {
             UnaryFunction::Neg => {
                 return Expr::unary_from(&self.argument.get_derivative(expr_key, expr_map), UnaryFunction::Neg)
+            },
+            UnaryFunction::Exp => {
+                return self.argument.get_derivative(expr_key, expr_map).mul(&Expr::Unary(self.clone()))
             }
         }
     }
@@ -373,15 +382,15 @@ fn test_basic_cleanup() {
 }
 
 #[test]
-fn test_power_derivative() {
+fn test_power() {
     let mut expr_map: HashMap<String, Box<Expr>> = HashMap::new();
 
     let x_key = String::from("x");
     let x_var = Expr::from_key(&x_key);
-    let x = Box::new(Expr::from_integer(5));
+    let x = Expr::from_integer(5);
     let one = Expr::from_integer(1);
 
-    expr_map.insert(x_key.clone(), x.clone());
+    expr_map.insert(x_key.clone(), Box::new(x));
 
     let y_key = String::from("y");
     let y_var = Expr::from_key(&y_key.clone());
@@ -406,4 +415,20 @@ fn test_power_derivative() {
     
     // d/dx -> (1 + x)^2 = 2(1 + x) = 12
     assert_eq!(y_squared.get_derivative(&x_key, &expr_map).eval(&expr_map), Numeric::from_integer(12));
+}
+
+#[test]
+fn test_exp() {
+    let mut expr_map: HashMap<String, Box<Expr>> = HashMap::new();
+
+    let x_key = String::from("x");
+    let x_val = Expr::from_integer(2);
+    let x = Expr::Variable(x_key.clone());
+
+    let e_to_x = x.exp();
+
+    expr_map.insert(x_key.clone(), Box::new(x_val));
+
+    // Derivative of the exponential function is equal to itself
+    assert_eq!(e_to_x.get_derivative(&x_key, &expr_map), e_to_x);
 }
