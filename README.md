@@ -4,7 +4,7 @@ A simple computer algebra system written in Rust.
 
 Currently, it correctly handles simple expressions containing the following:
 * Constant floats and integers
-* Variables, which are passed as an array to the `calculate` method
+* Variables are keys to a hash map storing key-expression pairs
 * Unary functions, such as `sin, cos, exp, sqrt & negation`
 * Binary function, such as `add, sub, mul, div, pow`
 

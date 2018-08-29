@@ -58,6 +58,14 @@ impl Numeric {
             Numeric::Integer(integer) => return *integer == 1
         }
     }
+
+    pub fn pow(&self, pow: IntegerType) -> Numeric {
+        match self {
+            Numeric::Real(real) => return Numeric::from_real(real.powi(pow as i32)),
+            Numeric::Complex(complex) => return Numeric::from_complex(complex.powi(pow as i32)),
+            Numeric::Integer(integer) => return Numeric::from_integer(integer.pow(pow as u32))
+        }
+    }
 }
 
 impl Neg for Numeric {
