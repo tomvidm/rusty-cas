@@ -7,7 +7,7 @@ use numeric::{Numeric, RealType, ComplexType, IntegerType};
 
 // Expression
 #[derive(Clone, PartialEq, Debug)]
-enum Expr {
+pub enum Expr {
     Numeric(Numeric),
     Power(Power),
     Variable(String),
@@ -22,7 +22,7 @@ struct Power {
 }
 
 #[derive(Clone, PartialEq, Debug)]
-enum UnaryFunction {
+pub enum UnaryFunction {
     Neg,
     Exp
 }
@@ -34,7 +34,7 @@ struct Unary {
 }
 
 #[derive(Clone, PartialEq, Debug)]
-enum BinaryFunction {
+pub enum BinaryFunction {
     Add,
     Sub,
     Mul,
@@ -49,19 +49,19 @@ struct Binary {
 }
 
 impl Expr {
-    fn from_real(val: RealType) -> Expr {
+    pub fn from_real(val: RealType) -> Expr {
         Expr::Numeric(Numeric::Real(val))
     }
 
-    fn from_complex(val: ComplexType) -> Expr {
+    pub fn from_complex(val: ComplexType) -> Expr {
         Expr::Numeric(Numeric::Complex(val))
     }
 
-    fn from_integer(val: IntegerType) -> Expr {
+    pub fn from_integer(val: IntegerType) -> Expr {
         Expr::Numeric(Numeric::Integer(val))
     }
 
-    fn from_key(key: &String) -> Expr {
+    pub fn from_key(key: &String) -> Expr {
         Expr::Variable(key.clone())
     }
 
@@ -79,7 +79,7 @@ impl Expr {
         }
     }
 
-    fn pow_from(base: &Expr, pow: IntegerType) -> Expr {
+    pub fn pow_from(base: &Expr, pow: IntegerType) -> Expr {
         Expr::Power(
             Power{
                 pow: pow,
@@ -88,7 +88,7 @@ impl Expr {
         )
     }
 
-    fn unary_from(argument: &Expr, function: UnaryFunction) -> Expr {
+    pub fn unary_from(argument: &Expr, function: UnaryFunction) -> Expr {
         Expr::Unary(
             Unary{
                 function: function,
@@ -97,7 +97,7 @@ impl Expr {
         )
     }
 
-    fn binary_from(lhs: &Expr, rhs: &Expr, function: BinaryFunction) -> Expr {
+    pub fn binary_from(lhs: &Expr, rhs: &Expr, function: BinaryFunction) -> Expr {
         Expr::Binary(
             Binary{
                 function: function,
@@ -107,7 +107,7 @@ impl Expr {
         )
     }
 
-    fn eval(&self, expr_map: &HashMap<String, Box<Expr>>) -> Numeric {
+    pub fn eval(&self, expr_map: &HashMap<String, Box<Expr>>) -> Numeric {
         match self {
             Expr::Numeric(number) => return number.clone(),
             Expr::Variable(key) => {
