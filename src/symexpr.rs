@@ -187,31 +187,31 @@ impl Expr {
         }
     }
 
-    fn neg(&self) -> Expr {
+    pub fn neg(&self) -> Expr {
         return Expr::unary_from(self, UnaryFunction::Neg)
     }
 
-    fn exp(&self) -> Expr {
+    pub fn exp(&self) -> Expr {
         return Expr::unary_from(self, UnaryFunction::Exp)
     }
 
-    fn add(&self, other: &Expr) -> Expr {
+    pub fn add(&self, other: &Expr) -> Expr {
         return Expr::binary_from(self, other, BinaryFunction::Add)
     }
 
-    fn sub(&self, other: &Expr) -> Expr {
+    pub fn sub(&self, other: &Expr) -> Expr {
         return Expr::binary_from(self, other, BinaryFunction::Sub)
     }
 
-    fn mul(&self, other: &Expr) -> Expr {
+    pub fn mul(&self, other: &Expr) -> Expr {
         return Expr::binary_from(self, other, BinaryFunction::Mul)
     }
 
-    fn div(&self, other: &Expr) -> Expr {
+    pub fn div(&self, other: &Expr) -> Expr {
         return Expr::binary_from(self, other, BinaryFunction::Div)
     }
     
-    fn pow(&self, pow: IntegerType) -> Expr {
+    pub fn pow(&self, pow: IntegerType) -> Expr {
         return Expr::pow_from(self, pow)
     }
 }
