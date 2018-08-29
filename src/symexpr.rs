@@ -134,6 +134,9 @@ impl Expr {
             Expr::Binary(binary) => {
                 return binary.clone().get_cleaned()
             },
+            Expr::Unary(unary) => {
+                return unary.clone().get_cleaned()
+            }
             _ => return self.clone()
         }
     }
@@ -165,6 +168,12 @@ impl Unary {
             UnaryFunction::Neg => return -self.argument.eval(expr_map)
         }
     }
+
+    fn get_cleaned(self) -> Expr {
+        match self.function {
+            _ => return Expr::unary_from(&self.argument.get_cleaned(), self.function)
+        }
+    }
 }
 
 impl Binary {
@@ -188,7 +197,7 @@ impl Binary {
                     return *self.lhs.clone()
                 }
 
-                return Expr::Binary(self)
+                return Expr::binary_from(&self.lhs.get_cleaned(), &self.rhs.get_cleaned(), self.function)
             },
             BinaryFunction::Mul => {
                 if self.lhs.is_zero() || self.rhs.is_zero() {
@@ -203,16 +212,16 @@ impl Binary {
                     return *self.lhs.clone()
                 }
 
-                return Expr::Binary(self)
+                return Expr::binary_from(&self.lhs.get_cleaned(), &self.rhs.get_cleaned(), self.function)
             },
             BinaryFunction::Div => {
                 if self.lhs == self.rhs {
                     return Expr::from_integer(1)
                 }
 
-                return Expr::Binary(self)
+                return Expr::binary_from(&self.lhs.get_cleaned(), &self.rhs.get_cleaned(), self.function)
             }
-            _ => return Expr::Binary(self)
+            _ => return Expr::binary_from(&self.lhs.get_cleaned(), &self.rhs.get_cleaned(), self.function)
         }
     }
 }
@@ -249,16 +258,23 @@ fn test_basic_cleanup() {
     let one = Expr::from_integer(1);
     let zero = Expr::from_integer(0);
 
-
     let one_plus_x = one.add(&x);
-    let messy_expr_1 = one.mul(&one_plus_x);
-    let messy_expr_2 = zero.mul(&one_plus_x);
-    let messy_expr_3 = zero.add(&one_plus_x);
-    let messy_expr_4 = one_plus_x.div(&one_plus_x);
-
     assert_eq!(one_plus_x.get_cleaned(), one_plus_x);
+
+    // 1 * (1 + x) = 1 + x
+    let messy_expr_1 = one.mul(&one_plus_x);
     assert_eq!(messy_expr_1.get_cleaned(), one_plus_x);
+    
+    // 0 * (1 + x) = 0
+    let messy_expr_2 = zero.mul(&one_plus_x);
     assert_eq!(messy_expr_2.get_cleaned(), zero);
+    
+    // 0 + (1 + x) = 1 + x
+    let messy_expr_3 = zero.add(&one_plus_x);
     assert_eq!(messy_expr_3.get_cleaned(), one_plus_x);
+    
+    // (1 + x) / (1 + x) = 1
+    let messy_expr_4 = one_plus_x.div(&one_plus_x);
     assert_eq!(messy_expr_4.get_cleaned(), one);
+
 }
