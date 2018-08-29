@@ -1,4 +1,4 @@
-mod symexpr2;
+mod symexpr;
 mod numeric;
 
 fn main() {
