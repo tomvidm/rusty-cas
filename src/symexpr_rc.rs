@@ -17,7 +17,7 @@ pub enum Expr {
 
 #[derive(Clone, PartialEq, Debug)]
 pub enum UnaryFunction {
-    Neg
+    Neg, Exp
 }
 
 #[derive(Clone, PartialEq, Debug)]
@@ -166,7 +166,8 @@ impl Expr {
 impl UnaryExpr {
     fn eval(&self, values: &Vec<Numeric>) -> Numeric {
         match self.function {
-            UnaryFunction::Neg => return -self.argument.eval(values)
+            UnaryFunction::Neg => return -self.argument.eval(values),
+            UnaryFunction::Exp => return self.argument.eval(values).exp()
         }
     }
 }
@@ -210,6 +211,10 @@ impl BinaryExpr {
 
 pub fn neg(arg: &Rc<Expr>) -> Rc<Expr> {
     Rc::new(Expr::unary_from_heap(&arg, UnaryFunction::Neg))
+}
+
+pub fn exp(arg: &Rc<Expr>) -> Rc<Expr> {
+    Rc::new(Expr::unary_from_heap(&arg, UnaryFunction::Exp))
 }
 
 pub fn add(lhs: &Rc<Expr>, rhs: &Rc<Expr>) -> Rc<Expr> {
