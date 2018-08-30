@@ -202,10 +202,26 @@ impl BinaryExpr {
                 } else {
                     return None
                 }
-            }
+            },
             _ => return None
         }
     }
+}
+
+pub fn neg(arg: &Rc<Expr>) -> Rc<Expr> {
+    Rc::new(Expr::unary_from_heap(&arg, UnaryFunction::Neg))
+}
+
+pub fn add(lhs: &Rc<Expr>, rhs: &Rc<Expr>) -> Rc<Expr> {
+    Rc::new(Expr::binary_from_heap(&lhs, &rhs, BinaryFunction::Add))
+}
+
+pub fn sub(lhs: &Rc<Expr>, rhs: &Rc<Expr>) -> Rc<Expr> {
+    Rc::new(Expr::binary_from_heap(&lhs, &neg(&rhs), BinaryFunction::Add))
+}
+
+pub fn mul(lhs: &Rc<Expr>, rhs: &Rc<Expr>) -> Rc<Expr> {
+    Rc::new(Expr::binary_from_heap(&lhs, &rhs, BinaryFunction::Mul))
 }
 
 #[cfg(test)]
@@ -281,4 +297,15 @@ fn test_trimming() {
 
     assert_eq!(*Expr::trim(&f), Expr::IndepVar(0));
     assert_eq!(*Expr::trim(&g), *g);
+}
+
+#[test]
+fn test_arithmetic() {
+    let values: Vec<Numeric> = Vec::new();
+    let a = Expr::from_integer(2).clone_to_heap();
+    let b = Expr::from_integer(3).clone_to_heap();
+
+    assert_eq!(add(&a, &b).eval(&values), Numeric::from_integer(5));
+    assert_eq!(sub(&a, &b).eval(&values), Numeric::from_integer(-1));
+    assert_eq!(mul(&a, &b).eval(&values), Numeric::from_integer(6));
 }

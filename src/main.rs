@@ -1,7 +1,6 @@
-mod symexpr;
 mod symexpr_rc;
-mod numeric;
 mod symengine;
+mod numeric;
 mod cli;
 
 fn main() {
