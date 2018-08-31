@@ -2,7 +2,7 @@ use numeric::{Numeric, IntegerType};
 use std::io;
 use std::char;
 
-#[derive(Clone, PartialEq, Debug)]
+#[derive(Clone, PartialEq, Debug, PartialOrd)]
 pub enum Token {
     Term(TermToken),
     Operator(Operator)
@@ -12,6 +12,13 @@ impl Token {
     fn is_term(&self) -> bool {
         match self {
             Token::Term(_term) => return true,
+            _ => return false
+        }
+    }
+
+    fn is_operator(&self) -> bool {
+        match self {
+            Token::Operator(_op) => return true,
             _ => return false
         }
     }
@@ -46,9 +53,16 @@ impl Token {
             _ => return false
         }
     }
+
+    fn is_right_parenthesis(&self) -> bool {
+        match self {
+            Token::Operator(op) => *op == RightP,
+            _ => return false
+        }
+    }
 }
 
-#[derive(Clone, PartialEq, Debug)]
+#[derive(Clone, PartialEq, Debug, PartialOrd)]
 pub struct Operator {
     precedence: i64,
     op: OperatorType
@@ -59,13 +73,13 @@ const RightP: Operator = Operator{precedence: 1, op: OperatorType::RightP};
 const Add: Operator = Operator{precedence: 2, op: OperatorType::Add};
 const Mul: Operator = Operator{precedence: 4, op: OperatorType::Mul};
 
-#[derive(Clone, PartialEq, Debug)]
+#[derive(Clone, PartialEq, Debug, PartialOrd)]
 pub enum TermToken {
     Number(Numeric),
     VariableKey(String)
 }
 
-#[derive(Clone, PartialEq, Debug)]
+#[derive(Clone, PartialEq, Debug, PartialOrd)]
 pub enum OperatorType {
     LeftP,
     RightP,
@@ -154,13 +168,70 @@ fn tokenize_string(string: &String) -> Tokens {
 }
 
 fn infix_to_postfix(tokens: &Tokens) -> Tokens {
-    let mut infix: Vec<Token> = Vec::new();
+    let mut postfix: Vec<Token> = Vec::new();
+    let mut opstack: Vec<Token> = Vec::new();
 
+    // For each token
     for token in tokens.iter() {
-
+        // If a number or variable
+        if token.is_term() {
+            postfix.push(token.clone());
+        } 
+        // If operator or parenthesis
+        else if token.is_operator() {
+            // If left parenthesis
+            if token.is_left_parenthesis() {
+                opstack.push(token.clone());
+            } 
+            // If right parenthesis
+            else if token.is_right_parenthesis() {
+                // Pop top of opstack if not empty
+                while let Some(op_from_stack) = opstack.pop() {
+                    // Pop operators onto output until a left parenthesis
+                    if op_from_stack.is_left_parenthesis() {
+                        break;
+                    } else {
+                        postfix.push(op_from_stack.clone());
+                    }
+                }
+            } 
+            // Else
+            else {
+                // Pop top of opstack if not empty
+                while let Some(op_from_stack) = opstack.pop() {
+                    // If top operator has higher precedence than current token
+                    println!("{:?} > {:?}", op_from_stack, token.clone());
+                    if op_from_stack.is_left_parenthesis() {
+                        opstack.push(op_from_stack);
+                        break;
+                    }
+                    
+                    if op_from_stack > *token {
+                        /// Push top operator to output
+                        postfix.push(op_from_stack.clone());
+                    }
+                }
+                // Push token to output
+                opstack.push(token.clone());
+            }
+        }
     }
 
-    return tokens.clone()
+    while let Some(remaining_op) = opstack.pop() {
+        postfix.push(remaining_op.clone());
+    }
+
+    return postfix;
+}
+
+#[cfg(test)]
+#[test]
+fn test_operator_precedence() {
+    use self::Token::{Term, Operator};
+    assert!(LeftP < Add);
+    assert!(Operator(LeftP) < Operator(Add));
+    assert!(Operator(Add) < Operator(Mul));
+    assert!(!Operator(LeftP).is_numeric());
 }
 
 #[cfg(test)]
@@ -252,6 +323,7 @@ fn test_infix_to_postfix() {
     use self::Token::{Term, Operator};
     use self::TermToken::{Number, VariableKey};
 
+    // 2
     let expr1: Vec<Token> = vec![
         Term(TermToken::Number(Numeric::from_integer(2)))
     ];
@@ -262,6 +334,7 @@ fn test_infix_to_postfix() {
     
     assert_eq!(infix_to_postfix(&expr1), expr1_postfix);
 
+    // 20 + x
     let expr2: Vec<Token> = vec![
         Term(TermToken::Number(Numeric::from_integer(20))), 
         Operator(Add), 
@@ -275,4 +348,28 @@ fn test_infix_to_postfix() {
     ];
 
     assert_eq!(infix_to_postfix(&expr2), expr2_postfix);
+
+    // a((123) + x)
+
+    let expr3: Vec<Token> = vec![
+        Term(VariableKey("a".to_string())),
+        Operator(Mul),
+        Operator(LeftP),
+        Operator(LeftP),
+        Term(TermToken::Number(Numeric::from_integer(123))), 
+        Operator(RightP),
+        Operator(Add),
+        Term(VariableKey("x".to_string())),
+        Operator(RightP)
+    ];
+
+    let expr3_postfix: Vec<Token> = vec![
+        Term(VariableKey("a".to_string())),
+        Term(TermToken::Number(Numeric::from_integer(123))), 
+        Term(VariableKey("x".to_string())),
+        Operator(Add),
+        Operator(Mul)
+    ];
+
+    assert_eq!(infix_to_postfix(&expr3), expr3_postfix);
 }

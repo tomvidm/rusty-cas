@@ -7,7 +7,7 @@ pub type RealType = f64;
 pub type IntegerType = i64;
 
 // Numeric type
-#[derive(Clone, Copy, PartialEq, Debug)]
+#[derive(Clone, Copy, PartialEq, Debug, PartialOrd)]
 pub enum Numeric {
     Real(RealType),
     Complex(ComplexType),
