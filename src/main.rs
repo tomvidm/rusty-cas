@@ -2,6 +2,7 @@ mod symexpr_rc;
 mod symengine;
 mod numeric;
 mod lexer;
+mod parser;
 mod cli;
 
 fn main() {

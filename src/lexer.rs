@@ -3,12 +3,19 @@ use std::io;
 use std::char;
 
 #[derive(Clone, PartialEq, Debug)]
-enum Token {
+pub enum Token {
     Term(TermToken),
-    Operator(OperatorToken)
+    Operator(Operator)
 }
 
 impl Token {
+    fn is_term(&self) -> bool {
+        match self {
+            Token::Term(_term) => return true,
+            _ => return false
+        }
+    }
+
     fn is_numeric(&self) -> bool {
         match self {
             Token::Term(term) => {
@@ -21,29 +28,45 @@ impl Token {
         }
     }
 
-    fn is_multiply_operator(&self) -> bool {
+    fn is_variable(&self) -> bool {
         match self {
-            Token::Operator(op) => *op == OperatorToken::Mul,
+            Token::Term(term) => {
+                match term {
+                    TermToken::VariableKey(_key) => return true,
+                    _ => return false
+                }
+            },
             _ => return false
         }
     }
 
     fn is_left_parenthesis(&self) -> bool {
         match self {
-            Token::Operator(op) => *op == OperatorToken::LeftP,
+            Token::Operator(op) => *op == LeftP,
             _ => return false
         }
     }
 }
 
 #[derive(Clone, PartialEq, Debug)]
-enum TermToken {
+pub struct Operator {
+    precedence: i64,
+    op: OperatorType
+}
+
+const LeftP: Operator = Operator{precedence: 1, op: OperatorType::LeftP};
+const RightP: Operator = Operator{precedence: 1, op: OperatorType::RightP};
+const Add: Operator = Operator{precedence: 2, op: OperatorType::Add};
+const Mul: Operator = Operator{precedence: 4, op: OperatorType::Mul};
+
+#[derive(Clone, PartialEq, Debug)]
+pub enum TermToken {
     Number(Numeric),
     VariableKey(String)
 }
 
 #[derive(Clone, PartialEq, Debug)]
-enum OperatorToken {
+pub enum OperatorType {
     LeftP,
     RightP,
     Add,
@@ -55,7 +78,6 @@ type Tokens = Vec<Token>;
 fn tokenize_number(slice: &str) -> Token {
     use self::Token::{Term, Operator};
     use self::TermToken::{Number, VariableKey};
-    use self::OperatorToken::{Add, Mul, LeftP, RightP};
 
     for ch in slice.chars() {
     }
@@ -91,7 +113,6 @@ fn get_length_of_numeric_sequence(tokens: &[Token]) -> usize {
 fn tokenize_string(string: &String) -> Tokens {
     use self::Token::{Term, Operator};
     use self::TermToken::{Number, VariableKey};
-    use self::OperatorToken::{Add, Mul, LeftP, RightP};
 
     let mut tokens: Vec<Token> = Vec::new();
     let mut result: Vec<Token> = Vec::new();
@@ -118,6 +139,12 @@ fn tokenize_string(string: &String) -> Tokens {
             if i < tokens.len() && tokens[i].is_left_parenthesis() {
                 result.push(Operator(Mul));
             }
+        } else if tokens[i].is_variable() {
+            result.push(tokens[i].clone());
+            if i < tokens.len() - 1 && tokens[i + 1].is_left_parenthesis() {
+                result.push(Operator(Mul));
+            }    
+            i += 1;
         } else {
             result.push(tokens[i].clone());
             i += 1;
@@ -126,12 +153,21 @@ fn tokenize_string(string: &String) -> Tokens {
     return result;
 }
 
+fn infix_to_postfix(tokens: &Tokens) -> Tokens {
+    let mut infix: Vec<Token> = Vec::new();
+
+    for token in tokens.iter() {
+
+    }
+
+    return tokens.clone()
+}
+
 #[cfg(test)]
 #[test]
 fn test_concatenation() {
     use self::Token::{Term, Operator};
     use self::TermToken::{Number, VariableKey};
-    use self::OperatorToken::{Add, Mul, LeftP, RightP};
 
     let tokenized: Vec<Token> = vec![
         Operator(Add),
@@ -152,8 +188,8 @@ fn test_concatenation() {
 fn test_tokenizer() {
     use self::Token::{Term, Operator};
     use self::TermToken::{Number, VariableKey};
-    use self::OperatorToken::{Add, Mul, LeftP, RightP};
 
+    // Check that space and trailing ; does are both ignored
     let expr1_variation1 = String::from(" 2");
     let expr1_variation2 = String::from("2 ;");
     let expr1_tokenized: Vec<Token> = vec![
@@ -163,6 +199,7 @@ fn test_tokenizer() {
     assert_eq!(tokenize_string(&expr1_variation1), expr1_tokenized);
     assert_eq!(tokenize_string(&expr1_variation2), expr1_tokenized);
 
+    // Check that integers and variables and operators are processed
     let expr2_variation1 = String::from("20 + x;");
     let expr2_variation2 = String::from("20 + x");
     let expr2_tokenized: Vec<Token> = vec![
@@ -174,6 +211,7 @@ fn test_tokenizer() {
     assert_eq!(tokenize_string(&expr2_variation1), expr2_tokenized);
     assert_eq!(tokenize_string(&expr2_variation2), expr2_tokenized);
 
+    // Check that numbers followed by left parenthesis has multiplication added explicitly
     let expr3_variation1 = String::from("32 * (x + y);");
     let expr3_variation2 = String::from("32(x + y)");
     let expr3_variation3 = String::from("32 (x+ y);");
@@ -192,13 +230,49 @@ fn test_tokenizer() {
     assert_eq!(tokenize_string(&expr3_variation2), expr3_tokenized);
     assert_eq!(tokenize_string(&expr3_variation3), expr3_tokenized);
 
-    let expr4_variation1 = String::from("1 10 100 13");
+    // Check that variables followed by left parenthesis has multipication added explicitly
+    let expr4_variation1 = String::from("x *( 1+x)");
+    let expr4_variation2 = String::from("x ( 1+x)");
     let expr4_tokenized = vec![
+        Term(TermToken::VariableKey("x".to_string())),
+        Operator(Mul),
+        Operator(LeftP),
         Term(TermToken::Number(Numeric::from_integer(1))),
-        Term(TermToken::Number(Numeric::from_integer(10))),
-        Term(TermToken::Number(Numeric::from_integer(100))),
-        Term(TermToken::Number(Numeric::from_integer(13)))
+        Operator(Add),
+        Term(TermToken::VariableKey("x".to_string())),
+        Operator(RightP)
     ];
 
     assert_eq!(tokenize_string(&expr4_variation1), expr4_tokenized);
+    assert_eq!(tokenize_string(&expr4_variation2), expr4_tokenized);
+}
+
+#[test]
+fn test_infix_to_postfix() {
+    use self::Token::{Term, Operator};
+    use self::TermToken::{Number, VariableKey};
+
+    let expr1: Vec<Token> = vec![
+        Term(TermToken::Number(Numeric::from_integer(2)))
+    ];
+
+    let expr1_postfix: Vec<Token> = vec![
+        Term(TermToken::Number(Numeric::from_integer(2)))
+    ];
+    
+    assert_eq!(infix_to_postfix(&expr1), expr1_postfix);
+
+    let expr2: Vec<Token> = vec![
+        Term(TermToken::Number(Numeric::from_integer(20))), 
+        Operator(Add), 
+        Term(VariableKey("x".to_string()))
+    ];
+
+    let expr2_postfix: Vec<Token> = vec![
+        Term(TermToken::Number(Numeric::from_integer(20))), 
+        Term(VariableKey("x".to_string())),
+        Operator(Add)
+    ];
+
+    assert_eq!(infix_to_postfix(&expr2), expr2_postfix);
 }
