@@ -1,29 +1,52 @@
 use numeric::{Numeric, IntegerType};
 use std::io;
 use std::char;
+use std::fmt;
 
-#[derive(Clone, PartialEq, Debug, PartialOrd)]
+#[derive(Clone, PartialEq, PartialOrd)]
 pub enum Token {
     Term(TermToken),
     Operator(Operator)
 }
 
+impl fmt::Debug for Token {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            Token::Term(term) => {
+                match term {
+                    TermToken::Number(number) => write!(f, "{:?}", *number),
+                    TermToken::VariableKey(key) => write!(f, "{:?}", *key)
+                }
+            },
+            Token::Operator(op) => {
+                match op.op {
+                    OperatorType::Add => write!(f, "+"),
+                    OperatorType::Mul => write!(f, "*"),
+                    OperatorType::LeftP => write!(f, "("),
+                    OperatorType::RightP => write!(f, ")"),
+                    OperatorType::Assignment => write!(f, "=")
+                }
+            }
+        }
+    }
+}
+
 impl Token {
-    fn is_term(&self) -> bool {
+    pub fn is_term(&self) -> bool {
         match self {
             Token::Term(_term) => return true,
             _ => return false
         }
     }
 
-    fn is_operator(&self) -> bool {
+    pub fn is_operator(&self) -> bool {
         match self {
             Token::Operator(_op) => return true,
             _ => return false
         }
     }
 
-    fn is_numeric(&self) -> bool {
+    pub fn is_numeric(&self) -> bool {
         match self {
             Token::Term(term) => {
                 match term {
@@ -35,7 +58,7 @@ impl Token {
         }
     }
 
-    fn is_variable(&self) -> bool {
+    pub fn is_variable(&self) -> bool {
         match self {
             Token::Term(term) => {
                 match term {
@@ -60,18 +83,26 @@ impl Token {
             _ => return false
         }
     }
+
+    pub fn is_assignment(&self) -> bool {
+        match self {
+            Token::Operator(op) => *op == Assignment,
+            _ => return false
+        }
+    }
 }
 
 #[derive(Clone, PartialEq, Debug, PartialOrd)]
 pub struct Operator {
     precedence: i64,
-    op: OperatorType
+    pub op: OperatorType
 }
 
 const LeftP: Operator = Operator{precedence: 1, op: OperatorType::LeftP};
 const RightP: Operator = Operator{precedence: 1, op: OperatorType::RightP};
 const Add: Operator = Operator{precedence: 2, op: OperatorType::Add};
 const Mul: Operator = Operator{precedence: 4, op: OperatorType::Mul};
+const Assignment: Operator = Operator{precedence: 4, op: OperatorType::Assignment};
 
 #[derive(Clone, PartialEq, Debug, PartialOrd)]
 pub enum TermToken {
@@ -84,10 +115,11 @@ pub enum OperatorType {
     LeftP,
     RightP,
     Add,
-    Mul
+    Mul,
+    Assignment
 }
 
-type Tokens = Vec<Token>;
+pub type Tokens = Vec<Token>;
 
 fn tokenize_number(slice: &str) -> Token {
     use self::Token::{Term, Operator};
@@ -124,7 +156,7 @@ fn get_length_of_numeric_sequence(tokens: &[Token]) -> usize {
     return tokens.len()
 }
 
-fn tokenize_string(string: &String) -> Tokens {
+pub fn tokenize_string(string: &String) -> Tokens {
     use self::Token::{Term, Operator};
     use self::TermToken::{Number, VariableKey};
 
@@ -138,6 +170,7 @@ fn tokenize_string(string: &String) -> Tokens {
             ')' => tokens.push(Operator(RightP)),
             '+' => tokens.push(Operator(Add)),
             '*' => tokens.push(Operator(Mul)),
+            '=' => tokens.push(Operator(Assignment)),
             '0'...'9' => tokens.push(Term(TermToken::Number(Numeric::from_integer(ch.to_digit(10).unwrap() as IntegerType)))),
             'A'...'z' => tokens.push(Term(TermToken::VariableKey(ch.to_string()))),
             _ => continue
@@ -167,12 +200,11 @@ fn tokenize_string(string: &String) -> Tokens {
     return result;
 }
 
-fn infix_to_postfix(tokens: &Tokens) -> Tokens {
+pub fn infix_to_postfix(tokens: &Tokens) -> Tokens {
     let mut postfix: Vec<Token> = Vec::new();
     let mut opstack: Vec<Token> = Vec::new();
-
     // For each token
-    for token in tokens.iter() {
+    for (i, token) in tokens.iter().enumerate() {
         // If a number or variable
         if token.is_term() {
             postfix.push(token.clone());
@@ -200,7 +232,6 @@ fn infix_to_postfix(tokens: &Tokens) -> Tokens {
                 // Pop top of opstack if not empty
                 while let Some(op_from_stack) = opstack.pop() {
                     // If top operator has higher precedence than current token
-                    println!("{:?} > {:?}", op_from_stack, token.clone());
                     if op_from_stack.is_left_parenthesis() {
                         opstack.push(op_from_stack);
                         break;
@@ -209,6 +240,9 @@ fn infix_to_postfix(tokens: &Tokens) -> Tokens {
                     if op_from_stack > *token {
                         /// Push top operator to output
                         postfix.push(op_from_stack.clone());
+                    } else {
+                        opstack.push(op_from_stack);
+                        break;
                     }
                 }
                 // Push token to output
@@ -222,6 +256,10 @@ fn infix_to_postfix(tokens: &Tokens) -> Tokens {
     }
 
     return postfix;
+}
+
+pub fn string_to_postfix(string: &String) -> Tokens {
+    infix_to_postfix(&tokenize_string(string))
 }
 
 #[cfg(test)]
@@ -316,6 +354,21 @@ fn test_tokenizer() {
 
     assert_eq!(tokenize_string(&expr4_variation1), expr4_tokenized);
     assert_eq!(tokenize_string(&expr4_variation2), expr4_tokenized);
+
+    let expr4 = String::from("2 + 3(1 +x)");
+    let expr4_tokenized: Vec<Token> = vec![
+        Term(TermToken::Number(Numeric::from_integer(2))), 
+        Operator(Add),
+        Term(TermToken::Number(Numeric::from_integer(3))), 
+        Operator(Mul),
+        Operator(LeftP),
+        Term(TermToken::Number(Numeric::from_integer(1))),
+        Operator(Add),
+        Term(VariableKey("x".to_string())),
+        Operator(RightP)
+    ];
+
+    assert_eq!(tokenize_string(&expr4), expr4_tokenized);
 }
 
 #[test]
@@ -372,4 +425,28 @@ fn test_infix_to_postfix() {
     ];
 
     assert_eq!(infix_to_postfix(&expr3), expr3_postfix);
+
+    let expr4_tokenized: Vec<Token> = vec![
+        Term(TermToken::Number(Numeric::from_integer(2))), 
+        Operator(Add),
+        Term(TermToken::Number(Numeric::from_integer(3))), 
+        Operator(Mul),
+        Operator(LeftP),
+        Term(TermToken::Number(Numeric::from_integer(1))),
+        Operator(Add),
+        Term(VariableKey("x".to_string())),
+        Operator(RightP)
+    ];
+
+    let expr4_postfix: Vec<Token> = vec![
+        Term(TermToken::Number(Numeric::from_integer(2))), 
+        Term(TermToken::Number(Numeric::from_integer(3))), 
+        Term(TermToken::Number(Numeric::from_integer(1))),
+        Term(VariableKey("x".to_string())),
+        Operator(Add),
+        Operator(Mul),
+        Operator(Add)
+    ];
+
+    assert_eq!(infix_to_postfix(&expr4_tokenized), expr4_postfix);
 }

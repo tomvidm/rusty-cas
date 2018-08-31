@@ -1,9 +1,11 @@
 use std::collections::{HashMap};
 use numeric::{Numeric};
-use symexpr_rc::{Expr};
+use symexpr_rc::{Expr, BinaryFunction};
 use std::rc::Rc;
+use lexer;
+use lexer::{Token, TermToken, OperatorType};
 
-struct Engine {
+pub struct Engine {
     variable_map: HashMap<String, usize>,
     variable_list: Vec<Numeric>,
     expr_map: HashMap<String, usize>,
@@ -11,7 +13,7 @@ struct Engine {
 }
 
 impl Engine {
-    fn new() -> Engine {
+    pub fn new() -> Engine {
         Engine {
             variable_map: HashMap::new(),
             variable_list: Vec::new(),
@@ -91,6 +93,94 @@ impl Engine {
             }
         }
     }
+
+    pub fn interpret(&mut self, expr_as_string: &String) {
+        let key = self.parse_string(&expr_as_string);
+        println!("  {}", self.eval_expr(&key).unwrap());
+    }
+
+    fn parse_string(&mut self, expr_as_string: &String) -> String {
+        let tokenized_string = lexer::tokenize_string(&expr_as_string);
+
+        let mut postfixed_tokens: Vec<Token> = Vec::new();
+        let mut assignment = false;
+        if tokenized_string.len() > 2 &&
+           tokenized_string[0].is_variable() && 
+           tokenized_string[1].is_assignment() {
+            assignment = true;
+            postfixed_tokens = lexer::infix_to_postfix(&tokenized_string[2..].to_vec());
+        } else {
+            postfixed_tokens = lexer::infix_to_postfix(&tokenized_string);
+        }
+        let mut stack: Vec<Rc<Expr>> = Vec::new();
+        for token in postfixed_tokens.iter() {
+            match token {
+                Token::Operator(op) => {
+                    let a = stack.pop().unwrap();
+                    let b = stack.pop().unwrap();
+
+                    match op.op {
+                        OperatorType::Add => stack.push(
+                            Expr::binary_from_heap(&a, &b, BinaryFunction::Add)
+                            .clone_to_heap()
+                        ),
+                        OperatorType::Mul => stack.push(
+                            Expr::binary_from_heap(&a, &b, BinaryFunction::Mul)
+                            .clone_to_heap()
+                        ),
+                        _ => continue
+                    }
+                },
+                Token::Term(term) => {
+                    match term {
+                        TermToken::Number(numeric) => {
+                            stack.push(Expr::from_numeric(*numeric).clone_to_heap())
+                        },
+                        TermToken::VariableKey(key) => {
+                            let index = match self.get_index_of_variable(key) {
+                                Some(index) => {
+                                    index
+                                },
+                                None => {
+                                    self.assign_variable(key, Numeric::from_integer(0))
+                                }
+                            };
+                            stack.push(Expr::from_key(index).clone_to_heap())
+                        }
+                    }
+                }
+            }
+        }
+
+        let result = Rc::clone(&stack[0]);
+
+        if assignment {
+            let token = tokenized_string[0].clone();
+            let key = match token {
+                Token::Term(term) => {
+                    match term {
+                        TermToken::VariableKey(varkey) => varkey,
+                        _ => "ans".to_string()
+                    }
+                },
+                _ => "ans".to_string()
+            };
+
+            if result.depends_on_any_variable() {
+                self.assign_expression(&key, &result);
+            } else {
+                let const_result = result.eval(&self.variable_list);
+
+                self.assign_variable(&key, const_result);
+                self.assign_expression(&key, &Expr::from_numeric(const_result).clone_to_heap());
+            }
+            return key
+        } else {
+            self.assign_expression(&"ans".to_string(), &result);
+        }
+
+        return "ans".to_string()
+    }
 }
 
 #[cfg(test)]
@@ -108,4 +198,11 @@ fn test_symengine_assignment_and_evaluation() {
     assert_eq!(engine.eval_expr(&"f".to_string()), Some(Numeric::from_integer(0)));
     let custom_values: Vec<Numeric> = vec![Numeric::from_real(2.)];
     assert_eq!(engine.eval_expr_with(&"f".to_string(), &custom_values), Some(Numeric::from_real(2.)));
+}
+
+#[test]
+fn test_parser() {
+    let mut engine = Engine::new();
+    engine.assign_variable(&"x".to_string(), Numeric::from_integer(2));
+
 }

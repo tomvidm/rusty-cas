@@ -42,6 +42,11 @@ impl Expr {
     pub fn zero() -> Expr {
         Expr::from_integer(0)
     }
+
+    pub fn from_numeric(val: Numeric) -> Expr {
+        Expr::Numeric(val)
+    }
+
     pub fn from_real(val: RealType) -> Expr {
         Expr::Numeric(Numeric::Real(val))
     }

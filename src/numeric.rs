@@ -1,5 +1,7 @@
 #![allow(dead_code)]
 
+use std::fmt;
+
 use std::ops::{Add, Sub, Mul, Div, Neg};
 
 pub type ComplexType = f64;
@@ -7,11 +9,31 @@ pub type RealType = f64;
 pub type IntegerType = i64;
 
 // Numeric type
-#[derive(Clone, Copy, PartialEq, Debug, PartialOrd)]
+#[derive(Clone, Copy, PartialEq, PartialOrd)]
 pub enum Numeric {
     Real(RealType),
     Complex(ComplexType),
     Integer(IntegerType)
+}
+
+impl fmt::Debug for Numeric {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            Numeric::Real(real) => write!(f, "{}", *real),
+            Numeric::Complex(complex) => write!(f, "{}", *complex),
+            Numeric::Integer(integer) => write!(f, "{}", *integer)
+        }
+    }
+}
+
+impl fmt::Display for Numeric {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            Numeric::Real(real) => write!(f, "{}", *real),
+            Numeric::Complex(complex) => write!(f, "{}", *complex),
+            Numeric::Integer(integer) => write!(f, "{}", *integer)
+        }
+    }
 }
 
 impl Numeric {

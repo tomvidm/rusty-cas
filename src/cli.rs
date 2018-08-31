@@ -1,8 +1,10 @@
 use std::io;
 use std::io::{Write};
+use symengine::{Engine};
 
 pub fn run() {
     show_welcome();
+    let mut engine = Engine::new();
     loop {
         let input = get_input();
         match input.trim() {
@@ -11,7 +13,7 @@ pub fn run() {
                 break;
             },
             "help" => show_help(),
-            _ => parse_input(&input)
+            _ => engine.interpret(&input)
         }
     }
 }
