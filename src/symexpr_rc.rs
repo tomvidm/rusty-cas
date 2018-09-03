@@ -1,13 +1,14 @@
 #![allow(dead_code)]
 
 use std::rc::Rc;
+use std::fmt;
 use std::collections::HashMap;
 use std::ops::{Deref};
 use numeric::{Numeric, RealType, ComplexType, IntegerType};
 
 type ExprMap = HashMap<String, Rc<Expr>>;
 
-#[derive(Clone, PartialEq, Debug)]
+#[derive(Clone, PartialEq)]
 pub enum Expr {
     Numeric(Numeric),
     IndepVar(usize),
@@ -22,25 +23,60 @@ pub enum UnaryFunction {
 
 #[derive(Clone, PartialEq, Debug)]
 pub enum BinaryFunction {
-    Add, Mul
+    Add, Mul, Sub, Div
 }
 
-#[derive(Clone, PartialEq, Debug)]
+#[derive(Clone, PartialEq)]
 pub struct UnaryExpr {
     function: UnaryFunction,
     argument: Rc<Expr>
 }
 
-#[derive(Clone, PartialEq, Debug)]
+#[derive(Clone, PartialEq)]
 pub struct BinaryExpr {
     function: BinaryFunction,
     lhs: Rc<Expr>,
     rhs: Rc<Expr>
 }
 
+impl fmt::Debug for Expr {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            Expr::Numeric(numeric) => write!(f, "{:?}", *numeric),
+            Expr::IndepVar(key) => write!(f, "{}", *key),
+            Expr::Unary(unary) => write!(f, "{:?}", *unary),
+            _ => write!(f, "???")
+        }
+    }
+}
+
+impl fmt::Debug for UnaryExpr {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self.function {
+            UnaryFunction::Neg => write!(f, "(-{:?})", self.argument),
+            UnaryFunction::Exp => write!(f, "exp({:?})", self.argument)
+        }
+    }
+}
+
+impl fmt::Debug for BinaryExpr {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self.function {
+            BinaryFunction::Add => write!(f, "({:?} + {:?})", self.lhs, self.rhs),
+            BinaryFunction::Sub => write!(f, "({:?} - {:?})", self.lhs, self.rhs),
+            BinaryFunction::Mul => write!(f, "{:?} * {:?})", self.lhs, self.rhs),
+            BinaryFunction::Div => write!(f, "{:?} / {:?}", self.lhs, self.rhs)
+        }
+    }
+}
+
 impl Expr {
     pub fn zero() -> Expr {
         Expr::from_integer(0)
+    }
+
+    pub fn one() -> Expr {
+        Expr::from_integer(1)
     }
 
     pub fn from_numeric(val: Numeric) -> Expr {
@@ -183,6 +219,10 @@ impl BinaryExpr {
             BinaryFunction::Add => return self.lhs.eval(values) +
                                           self.rhs.eval(values),
             BinaryFunction::Mul => return self.lhs.eval(values) *
+                                          self.rhs.eval(values),
+            BinaryFunction::Sub => return self.lhs.eval(values) -
+                                          self.rhs.eval(values),
+            BinaryFunction::Div => return self.lhs.eval(values) /
                                           self.rhs.eval(values)
         }
     }
@@ -205,6 +245,13 @@ impl BinaryExpr {
                     return Some(Rc::clone(&self.rhs))
                 } else if self.rhs.is_unity() {
                     return Some(Rc::clone(&self.lhs))
+                } else {
+                    return None
+                }
+            },
+            BinaryFunction::Div => {
+                if self.lhs == self.rhs {
+                    return Some(Rc::new(Expr::one()))
                 } else {
                     return None
                 }
@@ -232,6 +279,10 @@ pub fn sub(lhs: &Rc<Expr>, rhs: &Rc<Expr>) -> Rc<Expr> {
 
 pub fn mul(lhs: &Rc<Expr>, rhs: &Rc<Expr>) -> Rc<Expr> {
     Rc::new(Expr::binary_from_heap(&lhs, &rhs, BinaryFunction::Mul))
+}
+
+pub fn div(lhs: &Rc<Expr>, rhs: &Rc<Expr>) -> Rc<Expr> {
+    Rc::new(Expr::binary_from_heap(&lhs, &rhs, BinaryFunction::Div))
 }
 
 #[cfg(test)]
