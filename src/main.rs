@@ -1,6 +1,6 @@
-mod symexpr_rc;
-mod symengine;
+mod symexpr;
 mod numeric;
+mod token;
 mod lexer;
 mod cli;
 
